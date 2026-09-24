@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A PlayerView that renders through a TextureView instead of the library's default
+    SurfaceView. SurfaceView composites through an independent hardware layer that Compose's
+    graphicsLayer(compositingStrategy = Offscreen) + blend-mode masking cannot see, so the
+    Apple Music-style immersive cover's bottom fade has no effect on it. TextureView draws into
+    the normal View hierarchy and is compatible with that masking, at a real GPU/battery cost —
+    inflate this layout only for the one screen that needs the fade, not as a general default.
+    See DynamicCoverVideo's `useTextureView` parameter.
+-->
+<androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dynamic_cover_texture_player_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:surface_type="texture_view" />

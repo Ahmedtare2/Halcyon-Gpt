@@ -1,0 +1,682 @@
+package com.ella.music.ui.settings
+
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ella.music.BuildConfig
+import com.ella.music.R
+import com.ella.music.data.SettingsManager
+import com.ella.music.player.VivoAtomWalkmanWhitelist
+import com.ella.music.ui.components.EllaMiuixChip
+import com.ella.music.ui.components.EllaSmallTopAppBar
+import com.ella.music.ui.components.EllaSearchBar
+import com.ella.music.viewmodel.MainViewModel
+import com.ella.music.viewmodel.PlayerViewModel
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.ArrowRight
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun SettingsScreen(
+    onNavigateToAbout: () -> Unit,
+    onNavigateToAppearanceSettings: () -> Unit,
+    onNavigateToLibrarySettings: () -> Unit,
+    onNavigateToIntegrationSettings: () -> Unit,
+    onNavigateToLyricSettings: () -> Unit,
+    onNavigateToAudioSettings: () -> Unit,
+    onNavigateToBackupSettings: () -> Unit,
+    onNavigateToLogs: () -> Unit,
+    onNavigateToBottomNavigationSettings: () -> Unit = onNavigateToAppearanceSettings,
+    onNavigateToPlayerShortcutSettings: (String) -> Unit = { onNavigateToAppearanceSettings() },
+    onNavigateToHomeDisplaySettings: (String) -> Unit = { onNavigateToAppearanceSettings() },
+    onNavigateToScanFolders: () -> Unit = onNavigateToLibrarySettings,
+    onNavigateToHighlightedScanFolders: (String) -> Unit = { onNavigateToScanFolders() },
+    onNavigateToLyricFont: () -> Unit = onNavigateToLyricSettings,
+    onNavigateToLyricPluginSources: () -> Unit = onNavigateToLyricSettings,
+    onNavigateToHighlightedLyricSettings: (String) -> Unit = { onNavigateToLyricSettings() },
+    onNavigateToHighlightedAppearanceSettings: (String) -> Unit = { onNavigateToAppearanceSettings() },
+    onNavigateToHighlightedLibrarySettings: (String) -> Unit = { onNavigateToLibrarySettings() },
+    onNavigateToHighlightedIntegrationSettings: (String) -> Unit = { onNavigateToIntegrationSettings() },
+    onNavigateToHighlightedAudioSettings: (String) -> Unit = { onNavigateToAudioSettings() },
+    onNavigateToHighlightedBackupSettings: (String) -> Unit = { onNavigateToBackupSettings() },
+    onNavigateToEqualizer: () -> Unit = onNavigateToAudioSettings,
+    onNavigateToHighlightedEqualizer: (String) -> Unit = { onNavigateToEqualizer() },
+    onNavigateToCoverMediaSettings: () -> Unit = onNavigateToAppearanceSettings,
+    onNavigateToHighlightedCoverMediaSettings: (String) -> Unit = { onNavigateToCoverMediaSettings() },
+    onNavigateToSetupWizard: () -> Unit = {},
+    onNavigateToMaintenance: () -> Unit = {},
+    onBack: () -> Unit = {},
+    showBackButton: Boolean = true,
+    mainViewModel: MainViewModel? = null,
+    playerViewModel: PlayerViewModel? = null
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val settingsManager = remember { SettingsManager.getInstance(context) }
+    val searchHistory by settingsManager.settingsSearchHistory.collectAsState(initial = emptyList())
+    var searchQuery by remember { mutableStateOf("") }
+    var searchFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val inSearchMode = searchFocused || searchQuery.isNotBlank()
+    val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    val pageBackground = com.ella.music.ui.components.ellaPageBackground()
+    val searchEntries = settingsSearchEntries(
+        onNavigateToAppearanceSettings = onNavigateToAppearanceSettings,
+        onNavigateToBottomNavigationSettings = onNavigateToBottomNavigationSettings,
+        onNavigateToPlayerShortcutSettings = onNavigateToPlayerShortcutSettings,
+        onNavigateToHomeDisplaySettings = onNavigateToHomeDisplaySettings,
+        onNavigateToLibrarySettings = onNavigateToLibrarySettings,
+        onNavigateToScanFolders = onNavigateToScanFolders,
+        onNavigateToHighlightedScanFolders = onNavigateToHighlightedScanFolders,
+        onNavigateToIntegrationSettings = onNavigateToIntegrationSettings,
+        onNavigateToLyricSettings = onNavigateToLyricSettings,
+        onNavigateToLyricFont = onNavigateToLyricFont,
+        onNavigateToLyricPluginSources = onNavigateToLyricPluginSources,
+        onNavigateToHighlightedLyricSettings = onNavigateToHighlightedLyricSettings,
+        onNavigateToHighlightedAppearanceSettings = onNavigateToHighlightedAppearanceSettings,
+        onNavigateToHighlightedLibrarySettings = onNavigateToHighlightedLibrarySettings,
+        onNavigateToHighlightedIntegrationSettings = onNavigateToHighlightedIntegrationSettings,
+        onNavigateToHighlightedAudioSettings = onNavigateToHighlightedAudioSettings,
+        onNavigateToHighlightedBackupSettings = onNavigateToHighlightedBackupSettings,
+        onNavigateToAudioSettings = onNavigateToAudioSettings,
+        onNavigateToEqualizer = onNavigateToEqualizer,
+        onNavigateToHighlightedEqualizer = onNavigateToHighlightedEqualizer,
+        onNavigateToCoverMediaSettings = onNavigateToCoverMediaSettings,
+        onNavigateToHighlightedCoverMediaSettings = onNavigateToHighlightedCoverMediaSettings,
+        onNavigateToSetupWizard = onNavigateToSetupWizard,
+        onNavigateToBackupSettings = onNavigateToBackupSettings,
+        onNavigateToLogs = onNavigateToLogs,
+        onNavigateToAbout = onNavigateToAbout
+    )
+    val searchResults = remember(searchQuery, searchEntries) {
+        val query = searchQuery.trim()
+        if (query.isBlank()) {
+            emptyList()
+        } else {
+            searchEntries
+                .mapNotNull { entry -> entry.matchScore(query)?.let { score -> entry to score } }
+                .sortedWith(compareByDescending<Pair<SettingsSearchEntry, Int>> { it.second }.thenBy { it.first.title })
+                .map { it.first }
+                .distinctBy { "${it.title}\\u0000${it.summary}" }
+                .take(24)
+        }
+    }
+    val systemBarsMode by settingsManager.systemBarsMode.collectAsState(
+        initial = SettingsManager.SYSTEM_BARS_MODE_SHOW_BOTH
+    )
+    val systemBarsReserveSpace by settingsManager.systemBarsReserveSpace.collectAsState(
+        initial = SettingsManager.DEFAULT_SYSTEM_BARS_RESERVE_SPACE
+    )
+    val shouldReserveStatus = systemBarsReserveSpace || systemBarsMode !in setOf(
+        SettingsManager.SYSTEM_BARS_MODE_HIDE_STATUS,
+        SettingsManager.SYSTEM_BARS_MODE_HIDE_BOTH
+    )
+    val statusBarHeight = if (shouldReserveStatus) {
+        WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    } else {
+        0.dp
+    }
+    val topBarHeight = 56.dp + statusBarHeight
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(pageBackground)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberSettingsScrollState("settings_root"))
+                .padding(horizontal = 12.dp)
+        ) {
+            Spacer(modifier = Modifier.height(topBarHeight + 8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                EllaSearchBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    onSearch = {
+                        if (searchQuery.isNotBlank()) {
+                            scope.launch { settingsManager.recordSettingsSearchQuery(searchQuery) }
+                        }
+                    },
+                    placeholder = stringResource(R.string.settings_search_placeholder),
+                    autoFocus = false,
+                    onFocusChange = { searchFocused = it },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 4.dp)
+                )
+                if (inSearchMode) {
+                    Text(
+                        text = stringResource(R.string.common_cancel),
+                        color = MiuixTheme.colorScheme.primary,
+                        fontSize = 16.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                            searchQuery = ""
+                            searchFocused = false
+                            focusManager.clearFocus()
+                            }
+                            .padding(start = 12.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+                    )
+                }
+            }
+
+            if (inSearchMode) {
+                if (searchQuery.isNotBlank()) {
+                    SmallTitle(text = stringResource(R.string.settings_search_results))
+                    SettingsCardGroup {
+                        Column {
+                            if (searchResults.isEmpty()) {
+                                BasicComponent(
+                                    title = stringResource(R.string.settings_search_no_results),
+                                    summary = searchQuery
+                                )
+                            } else {
+                                searchResults.forEach { entry ->
+                                    BasicComponent(
+                                        title = entry.title,
+                                        summary = entry.summary,
+                                        modifier = Modifier.clickable {
+                                            scope.launch { settingsManager.recordSettingsSearchQuery(searchQuery) }
+                                            searchQuery = ""
+                                            searchFocused = false
+                                            focusManager.clearFocus()
+                                            entry.onClick()
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (searchHistory.isNotEmpty()) {
+                    SmallTitle(text = stringResource(R.string.settings_search_history))
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        searchHistory.forEach { query ->
+                            EllaMiuixChip(
+                                text = query,
+                                selected = false,
+                                onClick = {
+                                    searchQuery = query
+                                    searchFocused = false
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    scope.launch { settingsManager.recordSettingsSearchQuery(query) }
+                                },
+                                modifier = Modifier.widthIn(max = 220.dp),
+                                horizontalPadding = 16.dp,
+                                verticalPadding = 9.dp
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp, bottom = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_search_history_clear),
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    scope.launch { settingsManager.clearSettingsSearchHistory() }
+                                }
+                                .padding(horizontal = 18.dp, vertical = 10.dp)
+                        )
+                    }
+                }
+            }
+            if (!inSearchMode) {
+                SmallTitle(text = stringResource(R.string.settings_customize))
+
+                SettingsCardGroup {
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_appearance_home),
+                            summary = stringResource(R.string.settings_appearance_home_summary),
+                            onClick = onNavigateToAppearanceSettings
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_lyrics),
+                            summary = stringResource(R.string.settings_lyrics_summary),
+                            onClick = onNavigateToLyricSettings
+                        )
+                    }
+                }
+
+                SmallTitle(text = stringResource(R.string.settings_music_playback))
+
+                SettingsCardGroup {
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_audio),
+                            summary = stringResource(R.string.settings_audio_summary),
+                            onClick = onNavigateToAudioSettings
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_library_scan),
+                            summary = stringResource(R.string.settings_library_scan_summary),
+                            onClick = onNavigateToLibrarySettings
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_cover_media),
+                            summary = stringResource(R.string.settings_cover_media_summary),
+                            onClick = onNavigateToCoverMediaSettings
+                        )
+                    }
+                }
+
+                SmallTitle(text = stringResource(R.string.settings_services))
+
+                SettingsCardGroup {
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_integrations),
+                            summary = stringResource(R.string.settings_integrations_summary),
+                            onClick = onNavigateToIntegrationSettings
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_backup),
+                            summary = stringResource(R.string.settings_backup_summary),
+                            onClick = onNavigateToBackupSettings
+                        )
+                    }
+                }
+
+                SmallTitle(text = stringResource(R.string.settings_maintenance))
+
+                SettingsCardGroup {
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_maintenance),
+                            summary = stringResource(R.string.settings_maintenance_summary),
+                            onClick = onNavigateToMaintenance
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_logs),
+                            summary = stringResource(R.string.settings_logs_summary),
+                            onClick = onNavigateToLogs
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.about),
+                            summary = "${context.getString(R.string.app_name)} v${BuildConfig.VERSION_NAME}",
+                            onClick = onNavigateToAbout
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(160.dp))
+        }
+
+        EllaSmallTopAppBar(
+            title = stringResource(R.string.settings),
+            color = pageBackground,
+            centeredTitle = showBackButton,
+            defaultWindowInsetsPadding = shouldReserveStatus,
+            navigationIcon = {
+                if (showBackButton) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Back,
+                            contentDescription = stringResource(R.string.common_back)
+                        )
+                    }
+                }
+            },
+            titleStartPadding = if (showBackButton) 64.dp else 20.dp,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+    }
+}
+
+private data class SettingsSearchEntry(
+    val title: String,
+    val summary: String,
+    val keywords: String,
+    val onClick: () -> Unit
+) {
+    fun matchScore(query: String): Int? {
+        val terms = query.split(Regex("""\s+""")).filter { it.isNotBlank() }
+        if (terms.isEmpty()) return null
+        val titleMatches = terms.count { title.contains(it, ignoreCase = true) }
+        val keywordMatches = terms.count { keywords.contains(it, ignoreCase = true) }
+        val summaryMatches = terms.count { summary.contains(it, ignoreCase = true) }
+        if (titleMatches + keywordMatches + summaryMatches < terms.size) return null
+
+        // A direct setting-name match should remain ahead of a broad category hit.
+        return titleMatches * 100 + keywordMatches * 10 + summaryMatches
+    }
+}
+
+@Composable
+private fun settingsSearchEntries(
+    onNavigateToAppearanceSettings: () -> Unit,
+    onNavigateToBottomNavigationSettings: () -> Unit,
+    onNavigateToPlayerShortcutSettings: (String) -> Unit,
+    onNavigateToHomeDisplaySettings: (String) -> Unit,
+    onNavigateToLibrarySettings: () -> Unit,
+    onNavigateToScanFolders: () -> Unit,
+    onNavigateToHighlightedScanFolders: (String) -> Unit,
+    onNavigateToIntegrationSettings: () -> Unit,
+    onNavigateToLyricSettings: () -> Unit,
+    onNavigateToLyricFont: () -> Unit,
+    onNavigateToLyricPluginSources: () -> Unit,
+    onNavigateToHighlightedLyricSettings: (String) -> Unit,
+    onNavigateToHighlightedAppearanceSettings: (String) -> Unit,
+    onNavigateToHighlightedLibrarySettings: (String) -> Unit,
+    onNavigateToHighlightedIntegrationSettings: (String) -> Unit,
+    onNavigateToHighlightedAudioSettings: (String) -> Unit,
+    onNavigateToHighlightedBackupSettings: (String) -> Unit,
+    onNavigateToAudioSettings: () -> Unit,
+    onNavigateToEqualizer: () -> Unit,
+    onNavigateToHighlightedEqualizer: (String) -> Unit,
+    onNavigateToCoverMediaSettings: () -> Unit,
+    onNavigateToHighlightedCoverMediaSettings: (String) -> Unit,
+    onNavigateToSetupWizard: () -> Unit,
+    onNavigateToBackupSettings: () -> Unit,
+    onNavigateToLogs: () -> Unit,
+    onNavigateToAbout: () -> Unit
+): List<SettingsSearchEntry> {
+    fun entry(title: String, summary: String, keywords: String = "", onClick: () -> Unit) =
+        SettingsSearchEntry(title, summary, keywords, onClick)
+
+    return listOf(
+        entry(stringResource(R.string.settings_setup_wizard), stringResource(R.string.settings_setup_wizard_summary), "向导 引导 初始设置 新手") { onNavigateToSetupWizard() },
+        entry(stringResource(R.string.settings_appearance_home), stringResource(R.string.settings_appearance_home_summary), "主题 深色 浅色 跟随系统 语言 图标 壁纸 启动画面 底栏 沉浸 播放页 背景") { onNavigateToHighlightedAppearanceSettings("appearance") },
+        entry(stringResource(R.string.settings_bottom_dock_items), stringResource(R.string.settings_bottom_dock_items_summary), "底栏 底部导航 导航栏 入口 顺序 预览 搜索") { onNavigateToBottomNavigationSettings() },
+        entry(stringResource(R.string.settings_bottom_dock_merge_search), stringResource(R.string.settings_bottom_dock_merge_search_summary), "底栏 搜索 合并 收缩 迷你播放条 歌词") { onNavigateToBottomNavigationSettings() },
+        entry(stringResource(R.string.settings_player_shortcut_items), stringResource(R.string.settings_player_shortcut_items_summary), "播放页 快捷操作 快捷功能 菜单 预览 排序") { onNavigateToPlayerShortcutSettings("horizontal") },
+        entry(stringResource(R.string.settings_non_immersive_player_shortcuts), stringResource(R.string.settings_non_immersive_player_shortcuts_summary), "非沉浸 播放页 快捷操作 快捷功能 底部 4项") { onNavigateToPlayerShortcutSettings("non_immersive") },
+        entry(stringResource(R.string.settings_home_display), stringResource(R.string.settings_home_display_items_summary), "首页 功能块 宫格 顺序 隐藏 二级页") { onNavigateToHomeDisplaySettings("home_sections") },
+        entry(stringResource(R.string.settings_home_tile_colors_title), stringResource(R.string.settings_home_tile_colors_summary), "首页 功能块 颜色 卡片 透明度") { onNavigateToHomeDisplaySettings("home_tile_colors") },
+        entry(stringResource(R.string.settings_auto_show_search_keyboard), stringResource(R.string.settings_auto_show_search_keyboard_summary), "搜索 输入法 键盘 自动弹出") { onNavigateToHighlightedAppearanceSettings("auto_show_search_keyboard") },
+        entry(stringResource(R.string.settings_search_reopen_behavior), stringResource(R.string.settings_search_reopen_behavior_summary), "搜索 搜索框 清空 保留 选择 上次") { onNavigateToHighlightedAppearanceSettings("search_reopen_behavior") },
+        entry(stringResource(R.string.settings_font_settings), stringResource(R.string.settings_lyric_font), "字体 歌词字体 三级页") { onNavigateToLyricFont() },
+        entry(stringResource(R.string.settings_cover_media), stringResource(R.string.settings_cover_media_summary), "封面 动态封面 MV 艺术家封面 影像") { onNavigateToHighlightedCoverMediaSettings("cover_media") },
+        entry(stringResource(R.string.settings_dynamic_cover), stringResource(R.string.settings_dynamic_cover_summary), "视频封面 动态封面 mp4 MV 文件夹 相册权限") { onNavigateToHighlightedCoverMediaSettings("dynamic_cover") },
+        entry(stringResource(R.string.settings_music_video_sync), stringResource(R.string.settings_music_video_sync_summary), "MV 音乐视频 同步 静音") { onNavigateToHighlightedCoverMediaSettings("music_video") },
+        entry(stringResource(R.string.settings_music_video_fullscreen_button), stringResource(R.string.settings_music_video_fullscreen_button_summary), "MV 静音 全屏 按钮 播放页") { onNavigateToHighlightedCoverMediaSettings("music_video_fullscreen_button") },
+        entry(stringResource(R.string.settings_music_video_long_press_info), stringResource(R.string.settings_music_video_long_press_info_summary), "MV 长按 视频信息 对话框") { onNavigateToHighlightedCoverMediaSettings("music_video_long_press_info") },
+        entry(stringResource(R.string.settings_music_video_long_press_immersive_lyrics), stringResource(R.string.settings_music_video_long_press_immersive_lyrics_summary), "MV 长按 沉浸 歌词") { onNavigateToHighlightedCoverMediaSettings("music_video_long_press_immersive_lyrics") },
+        entry(stringResource(R.string.settings_player_album_cover_corner_radius), stringResource(R.string.settings_player_cover_corner_radius_summary), "播放页 封面 圆角") { onNavigateToHighlightedCoverMediaSettings("player_album_cover_corner_radius") },
+        entry(stringResource(R.string.settings_player_music_video_corner_radius), stringResource(R.string.settings_player_cover_corner_radius_summary), "播放页 MV 圆角") { onNavigateToHighlightedCoverMediaSettings("player_music_video_corner_radius") },
+        entry(stringResource(R.string.settings_player_show_total_duration), stringResource(R.string.settings_player_show_total_duration_summary), "进度条 总时长 剩余时间 播放时间 拖动预览") { onNavigateToHighlightedAppearanceSettings("player_show_total_duration") },
+        entry(stringResource(R.string.settings_player_show_song_annotation), stringResource(R.string.settings_player_show_song_annotation_summary), "播放页 歌曲注释 注释 annotation") { onNavigateToHighlightedAppearanceSettings("player_show_song_annotation") },
+        entry(stringResource(R.string.settings_player_tap_seek), stringResource(R.string.settings_player_tap_seek_summary), "进度条 点击 跳转 拖动") { onNavigateToHighlightedAppearanceSettings("player_tap_seek") },
+        entry(stringResource(R.string.settings_transport_button_outlines), stringResource(R.string.settings_transport_button_outlines_summary), "播放页 控制 按钮 轮廓 外框 描边") { onNavigateToHighlightedAppearanceSettings("transport_button_outlines") },
+        entry(stringResource(R.string.settings_player_immersive_cover), stringResource(R.string.settings_player_immersive_cover_summary), "沉浸 播放页 封面 全屏") { onNavigateToHighlightedAppearanceSettings("player_immersive") },
+        entry(stringResource(R.string.settings_player_page_style), stringResource(R.string.settings_player_page_style_summary), "播放页 Apple Music 封面 歌词 样式") { onNavigateToHighlightedAppearanceSettings("player_page") },
+        entry(stringResource(R.string.settings_apple_music_player_immersive_cover), stringResource(R.string.settings_apple_music_player_immersive_cover_summary), "Apple Music 1:1 正方形 沉浸 封面") { onNavigateToHighlightedAppearanceSettings("player_apple_music_immersive_cover") },
+        entry(stringResource(R.string.settings_system_bars_mode), stringResource(R.string.settings_system_bars_mode_summary, ""), "沉浸模式 全屏 状态栏 导航栏 隐藏 显示 车机") { onNavigateToHighlightedAppearanceSettings("system_bars") },
+        entry(stringResource(R.string.settings_player_immersive_mode), stringResource(R.string.settings_player_immersive_mode_summary, ""), "播放页 沉浸 状态栏 导航栏") { onNavigateToHighlightedAppearanceSettings("player_system_bars") },
+        entry(stringResource(R.string.settings_player_landscape_hide_system_bars), stringResource(R.string.settings_player_landscape_hide_system_bars_summary), "播放页 横屏 状态栏 导航栏 手势条 隐藏") { onNavigateToHighlightedAppearanceSettings("player_landscape_hide_system_bars") },
+        entry(stringResource(R.string.settings_player_landscape_style), stringResource(R.string.settings_player_landscape_style_summary, ""), "横屏播放 宽屏 歌词 CoverFlow MV 流光") { onNavigateToHighlightedAppearanceSettings("player_landscape") },
+        entry(stringResource(R.string.settings_beautiful_lyrics_background), stringResource(R.string.settings_beautiful_lyrics_background_summary), "Apple Music 动态背景 歌词页 流光 取色") { onNavigateToHighlightedAppearanceSettings("beautiful_lyrics") },
+        entry(stringResource(R.string.settings_player_dynamic_flow), stringResource(R.string.settings_player_dynamic_flow_summary), "Apple Music 流光 动态 背景 流动") { onNavigateToHighlightedAppearanceSettings("player_dynamic_flow") },
+        entry(stringResource(R.string.settings_apple_flow_speed), stringResource(R.string.settings_apple_flow_speed_summary), "Apple Music 流光速度 动态背景 封面") { onNavigateToHighlightedAppearanceSettings("apple_flow_speed") },
+        entry(stringResource(R.string.settings_beautiful_lyrics_speed), stringResource(R.string.settings_beautiful_lyrics_speed_summary), "Beautiful Lyrics 流光速度 动态背景") { onNavigateToHighlightedAppearanceSettings("beautiful_lyrics_speed") },
+        entry(stringResource(R.string.settings_beautiful_lyrics_blur), stringResource(R.string.settings_beautiful_lyrics_blur_summary), "Beautiful Lyrics 模糊 动态背景") { onNavigateToHighlightedAppearanceSettings("beautiful_lyrics_blur") },
+        entry(stringResource(R.string.settings_beautiful_lyrics_brightness), stringResource(R.string.settings_beautiful_lyrics_brightness_summary), "Beautiful Lyrics 亮度 动态背景") { onNavigateToHighlightedAppearanceSettings("beautiful_lyrics_brightness") },
+        entry(stringResource(R.string.settings_player_title_position), stringResource(R.string.settings_player_title_position_summary), "播放页 标题 封面 位置") { onNavigateToHighlightedAppearanceSettings("player_title_position") },
+        entry(stringResource(R.string.settings_search_click_playback_mode), stringResource(R.string.settings_search_click_playback_mode_summary), "搜索 点击 下一首 队列 替换") { onNavigateToHighlightedAppearanceSettings("search_click_playback_mode") },
+        entry(stringResource(R.string.settings_library_source), stringResource(R.string.settings_library_source_summary), "音乐来源 音乐库来源 本地 Navidrome Emby 远程 曲库") { onNavigateToHighlightedLibrarySettings("library_source") },
+        entry(stringResource(R.string.settings_library_scan), stringResource(R.string.settings_library_scan_summary), "音乐库 扫描 标签 全标签 搜索 分隔符 艺术家 歌手") { onNavigateToHighlightedLibrarySettings("scan") },
+        entry(stringResource(R.string.settings_scan_folders), stringResource(R.string.settings_scan_folders_summary), "文件夹 USB 隐藏目录 三级页") { onNavigateToHighlightedScanFolders("scan_folders") },
+        entry(stringResource(R.string.settings_full_tag_search), stringResource(R.string.settings_full_tag_search_summary_on), "全字段 全字段搜索 全标签 标签 元数据 作曲 作词 注释 别名 自定义标签 扫描 速度") { onNavigateToHighlightedScanFolders("scan_media_source") },
+        entry(stringResource(R.string.folder_force_full_rescan), stringResource(R.string.folder_force_full_rescan_summary), "强制重扫 全量扫描 标签 缓存") { onNavigateToHighlightedScanFolders("scan_media_source") },
+        entry(stringResource(R.string.settings_show_album_artists), stringResource(R.string.settings_show_album_artists_summary), "艺术家 歌手 歌者 artist singer performer 专辑艺术家 发行专辑") { onNavigateToHighlightedLibrarySettings("show_album_artists") },
+        entry(stringResource(R.string.settings_show_artist_introduction), stringResource(R.string.settings_show_artist_introduction_summary), "艺术家 歌手 介绍 简介 artist introduction biography") { onNavigateToHighlightedLibrarySettings("show_artist_introduction") },
+        entry(stringResource(R.string.settings_artist_bio_download), stringResource(R.string.settings_artist_bio_download_summary), "艺术家 传记 Last.fm wiki 自动下载 Wi-Fi") { onNavigateToHighlightedLibrarySettings("artist_bio_download") },
+        entry(stringResource(R.string.settings_artist_cover_folder), stringResource(R.string.settings_artist_cover_folder_summary), "艺术家 歌手 artist 封面 动态封面 视频封面 mp4 轮播 图片目录") { onNavigateToHighlightedCoverMediaSettings("artist_cover_folder") },
+        entry(stringResource(R.string.settings_artist_cover_carousel), stringResource(R.string.settings_artist_cover_carousel_summary), "艺术家 歌手 artist 封面 动态封面 轮播") { onNavigateToHighlightedCoverMediaSettings("artist_cover_carousel") },
+          entry(stringResource(R.string.settings_artist_image_download), stringResource(R.string.settings_artist_image_download_summary), "艺术家 歌手 artist 图片 封面 自动下载 Last.fm Spotify 网易云 Wi-Fi") { onNavigateToHighlightedCoverMediaSettings("artist_image_download") },
+          entry(stringResource(R.string.settings_artist_image_region), stringResource(R.string.settings_artist_image_region_summary), "艺术家 歌手 artist 图片 封面 Last.fm Spotify 地区 区域 market") { onNavigateToHighlightedCoverMediaSettings("artist_image_region") },
+          entry(stringResource(R.string.settings_artist_image_sources), stringResource(R.string.settings_artist_image_sources_summary), "艺术家 歌手 artist 图片 封面 来源 优先级 顺序 Last.fm Spotify 网易云") { onNavigateToHighlightedCoverMediaSettings("artist_image_sources") },
+        entry(stringResource(R.string.settings_spotify_client_id), stringResource(R.string.settings_spotify_client_id_summary), "艺术家 图片 Spotify Client ID API") { onNavigateToHighlightedCoverMediaSettings("artist_image_sources") },
+        entry(stringResource(R.string.settings_spotify_client_secret), stringResource(R.string.settings_spotify_client_secret_summary), "艺术家 图片 Spotify Client Secret API") { onNavigateToHighlightedCoverMediaSettings("artist_image_sources") },
+        entry(stringResource(R.string.settings_artist_separators), stringResource(R.string.settings_artist_separators_summary), "艺术家 歌手 artist 分隔符 feat 合作 作曲 作词") { onNavigateToHighlightedLibrarySettings("artist_separators") },
+        entry(stringResource(R.string.settings_artist_protected_names), stringResource(R.string.settings_artist_protected_names_summary), "艺术家 歌手 artist 不拆分 分隔符 保护名称") { onNavigateToHighlightedLibrarySettings("artist_protected_names") },
+        entry(stringResource(R.string.settings_search_all_song_match_types), stringResource(R.string.settings_search_all_song_match_types_summary), "搜索 所有 歌曲 艺术家 歌手 专辑 专辑艺术家 元数据 歌词") { onNavigateToHighlightedLibrarySettings("search_all_song_match_types") },
+        entry(stringResource(R.string.settings_search_all_categories), stringResource(R.string.settings_search_all_categories_summary), "搜索 所有 分类 艺术家 歌手 文件夹 作曲 作词 流派 年份") { onNavigateToHighlightedLibrarySettings("search_all_categories") },
+        entry(stringResource(R.string.settings_library_tile_artist), stringResource(R.string.settings_library_tile_artist_summary), "首页 艺术家 歌手 artist 音乐库 宫格") { onNavigateToHomeDisplaySettings("home_sections") },
+        entry(stringResource(R.string.settings_lyric_timing_editor), stringResource(R.string.settings_editor_builtin_lyric_timing), "歌词 打轴 时间轴 LRC 内置 编辑器 LySy") { onNavigateToHighlightedLibrarySettings("tag_scraping") },
+        entry(stringResource(R.string.settings_lyrics), stringResource(R.string.settings_lyrics_summary), "歌词 逐字 翻译 音译 字体 对齐 大小 黑名单 歌词源") { onNavigateToHighlightedLyricSettings("lyric_basic") },
+        entry(stringResource(R.string.settings_lyric_word_seek), stringResource(R.string.settings_lyric_word_seek_summary), "歌词 逐字 精确 定位 点击 跳转") { onNavigateToHighlightedLyricSettings("lyric_word_seek") },
+        entry(stringResource(R.string.settings_lyric_touch_feedback), stringResource(R.string.settings_lyric_touch_feedback_summary), "歌词 点击 按下 轮廓 泛光 水波纹 触控 反馈") { onNavigateToHighlightedLyricSettings("lyric_touch_feedback") },
+        entry(stringResource(R.string.settings_mini_player_lyrics), stringResource(R.string.settings_mini_player_lyrics_summary), "迷你歌词 小窗 翻译 音译 迷你播放器") { onNavigateToHighlightedLyricSettings("mini_lyrics") },
+        entry(stringResource(R.string.desktop_lyric_status_bar_mode), stringResource(R.string.desktop_lyric_status_bar_mode_summary), "桌面歌词 悬浮窗 状态栏歌词 暂停隐藏 横屏隐藏 宽度 位置 对齐") { onNavigateToHighlightedLyricSettings("desktop_lyric") },
+        entry(stringResource(R.string.settings_enable_lyricon), stringResource(R.string.settings_enable_lyricon_summary), "词幕 Lyricon 外部歌词 翻译 音译") { onNavigateToHighlightedLyricSettings("lyricon") },
+        entry(stringResource(R.string.settings_enable_super_lyric), stringResource(R.string.settings_enable_super_lyric_summary), "超级歌词 状态栏 通知 横幅 蓝牙 ColorOS") { onNavigateToHighlightedLyricSettings("lyric_output") },
+        entry(stringResource(R.string.settings_enable_coloros_lock_screen_lyric), stringResource(R.string.settings_enable_coloros_lock_screen_lyric_summary), "ColorOS 锁屏岛 歌词 lyricInfo MediaMetadata OPPO 一加") { onNavigateToHighlightedLyricSettings("coloros_lock_screen_lyric") },
+        entry(stringResource(R.string.settings_lyric_plugin_sources), stringResource(R.string.settings_lyric_plugin_sources_summary), "在线歌词 匹配 插件 三级页") { onNavigateToHighlightedLyricSettings("lyric_plugin_sources") },
+        entry(stringResource(R.string.settings_audio), stringResource(R.string.settings_audio_summary), "播放 无缝 gapless 淡入淡出 crossfade ReplayGain 回放增益 随机 下一首 解码 焦点 蓝牙 伴奏 人声") { onNavigateToHighlightedAudioSettings("audio_playback") },
+        entry(stringResource(R.string.settings_usb_dac_mode), stringResource(R.string.settings_usb_dac_mode_summary), "USB DAC 独占 高解析 输出 位深 采样率") { onNavigateToHighlightedAudioSettings("audio_output") },
+        entry(stringResource(R.string.settings_decoder), stringResource(R.string.settings_audio_decoder_auto_summary), "解码 FFmpeg 系统 音频焦点") { onNavigateToHighlightedAudioSettings("audio_system") },
+        entry(stringResource(R.string.equalizer_screen_title), stringResource(R.string.settings_audio_equalizer_summary), "均衡器 EQ 低音 高音 压缩器 立体声 360 环绕音 混响") { onNavigateToHighlightedEqualizer("equalizer") },
+        entry(stringResource(R.string.equalizer_surround_360_enable), stringResource(R.string.equalizer_surround_360_summary), "360 环绕音 空间音频 spatial 音场 强度 旋转") { onNavigateToHighlightedEqualizer("equalizer") },
+        entry(stringResource(R.string.settings_integrations), stringResource(R.string.settings_integrations_summary), "AI Anthropic DeepSeek MCP Last.fm 集成 API") { onNavigateToHighlightedIntegrationSettings("ai") },
+        entry(stringResource(R.string.settings_mcp_server), stringResource(R.string.settings_mcp_server_summary), "MCP 服务 本地 端口 集成") { onNavigateToHighlightedIntegrationSettings("mcp") },
+        entry(stringResource(R.string.web_music_beta_title), stringResource(R.string.web_music_beta_summary), "Web 网页 局域网 上传 播放 Beta") { onNavigateToHighlightedIntegrationSettings("web_music") },
+        entry(stringResource(R.string.settings_backup), stringResource(R.string.settings_backup_summary), "备份 恢复 WebDAV 自动备份 播放记录 设置") { onNavigateToHighlightedBackupSettings("backup_settings") },
+        entry(stringResource(R.string.settings_logs), stringResource(R.string.settings_logs_summary), "日志 logcat 崩溃 警告") { onNavigateToLogs() },
+        entry(stringResource(R.string.about), BuildConfig.VERSION_NAME, "版本 更新 关于") { onNavigateToAbout() }
+    ) + settingsSearchAliases(
+        entry = ::entry,
+        onAppearance = onNavigateToHighlightedAppearanceSettings,
+        onHome = onNavigateToHomeDisplaySettings,
+        onLibrary = onNavigateToHighlightedLibrarySettings,
+        onLyrics = onNavigateToHighlightedLyricSettings,
+        onAudio = onNavigateToHighlightedAudioSettings,
+        onBackup = onNavigateToHighlightedBackupSettings,
+        onEqualizer = onNavigateToHighlightedEqualizer,
+        onIntegration = onNavigateToHighlightedIntegrationSettings,
+        onLyricFont = onNavigateToLyricFont,
+        onLyricPlugins = onNavigateToLyricPluginSources,
+        onLogs = onNavigateToLogs,
+        onAbout = onNavigateToAbout,
+        onCoverMedia = onNavigateToHighlightedCoverMediaSettings
+    ) + settingsSearchFallbackEntries(
+        entry = ::entry,
+        onAppearance = onNavigateToHighlightedAppearanceSettings,
+        onHome = onNavigateToHomeDisplaySettings,
+        onLibrary = onNavigateToHighlightedLibrarySettings,
+        onLyrics = onNavigateToHighlightedLyricSettings,
+        onAudio = onNavigateToHighlightedAudioSettings,
+        onBackup = onNavigateToHighlightedBackupSettings,
+        onIntegration = onNavigateToHighlightedIntegrationSettings,
+        onCoverMedia = onNavigateToHighlightedCoverMediaSettings
+    )
+}
+
+/**
+ * Most settings are declared in their own preference sections. Keep a resource-backed safety net
+ * here so a newly added setting cannot silently be omitted from global search again (#376).
+ */
+@Composable
+private fun settingsSearchFallbackEntries(
+    entry: (String, String, String, () -> Unit) -> SettingsSearchEntry,
+    onAppearance: (String) -> Unit,
+    onHome: (String) -> Unit,
+    onLibrary: (String) -> Unit,
+    onLyrics: (String) -> Unit,
+    onAudio: (String) -> Unit,
+    onBackup: (String) -> Unit,
+    onIntegration: (String) -> Unit,
+    onCoverMedia: (String) -> Unit
+): List<SettingsSearchEntry> {
+    val resources = LocalContext.current.resources
+    return R.string::class.java.fields
+        .asSequence()
+        .mapNotNull { field ->
+            val name = field.name
+            if (!name.startsWith("settings_") || name.endsWith("_summary")) return@mapNotNull null
+            if (name == "settings_enable_vivo_atom_walkman_whitelist" &&
+                !VivoAtomWalkmanWhitelist.isVivoOrIqooDevice()
+            ) return@mapNotNull null
+            val id = runCatching { field.getInt(null) }.getOrNull() ?: return@mapNotNull null
+            val title = runCatching { resources.getString(id) }.getOrNull()?.trim().orEmpty()
+            if (title.isBlank() || title.contains("%")) return@mapNotNull null
+            val route = when (val destination = settingsSearchFallbackDestination(name)) {
+                is SettingsSearchFallbackDestination.Appearance -> {
+                    { onAppearance(destination.highlight) }
+                }
+                is SettingsSearchFallbackDestination.Home -> {
+                    { onHome(destination.highlight) }
+                }
+                is SettingsSearchFallbackDestination.Library -> {
+                    { onLibrary(destination.highlight) }
+                }
+                is SettingsSearchFallbackDestination.Lyrics -> {
+                    { onLyrics(destination.highlight) }
+                }
+                is SettingsSearchFallbackDestination.Audio -> {
+                    { onAudio(destination.highlight) }
+                }
+                is SettingsSearchFallbackDestination.Backup -> {
+                    { onBackup(destination.highlight) }
+                }
+                is SettingsSearchFallbackDestination.Integration -> {
+                    { onIntegration(destination.highlight) }
+                }
+                is SettingsSearchFallbackDestination.CoverMedia -> {
+                    { onCoverMedia(destination.highlight) }
+                }
+            }
+            val summaryId = resources.getIdentifier("${name}_summary", "string", resources.getResourcePackageName(id))
+            val summary = if (summaryId != 0) resources.getString(summaryId) else ""
+            entry(title, summary, name.removePrefix("settings_").replace('_', ' '), route)
+        }
+        .toList()
+}
+
+@Composable
+private fun settingsSearchAliases(
+    entry: (String, String, String, () -> Unit) -> SettingsSearchEntry,
+    onAppearance: (String) -> Unit,
+    onHome: (String) -> Unit,
+    onLibrary: (String) -> Unit,
+    onLyrics: (String) -> Unit,
+    onAudio: (String) -> Unit,
+    onBackup: (String) -> Unit,
+    onEqualizer: (String) -> Unit,
+    onIntegration: (String) -> Unit,
+    onLyricFont: () -> Unit,
+    onLyricPlugins: () -> Unit,
+    onLogs: () -> Unit,
+    onAbout: () -> Unit,
+    onCoverMedia: (String) -> Unit
+): List<SettingsSearchEntry> = listOf(
+    entry(stringResource(R.string.settings_app_wallpaper), stringResource(R.string.settings_app_wallpaper_summary), "壁纸 图片 背景 模糊 毛玻璃 透明") { onAppearance("wallpaper") },
+    entry(stringResource(R.string.settings_app_now_playing_flow_background), stringResource(R.string.settings_app_now_playing_flow_background_summary), "首页 音乐库 艺术家 专辑 歌单 文件夹 当前歌曲 流光 动态背景") { onAppearance("wallpaper") },
+    entry(stringResource(R.string.settings_app_icon), stringResource(R.string.settings_app_icon_summary), "图标 启动器 图标包 anime loli") { onAppearance("app_icon") },
+    entry(stringResource(R.string.settings_custom_launcher_icon), stringResource(R.string.settings_custom_launcher_icon_summary), "图标 自定义 快捷方式 桌面 shortcut launcher icon") { onAppearance("app_icon") },
+    entry(stringResource(R.string.settings_player_immersive_cover), stringResource(R.string.settings_player_immersive_cover_summary), "沉浸播放页 封面取色 文字 图标 背景 动态背景") { onAppearance("player_immersive") },
+    entry(stringResource(R.string.settings_player_page_style), stringResource(R.string.settings_player_page_style_summary), "播放页 Apple Music 封面 歌词 样式") { onAppearance("player_page") },
+    entry(stringResource(R.string.settings_apple_music_player_immersive_cover), stringResource(R.string.settings_apple_music_player_immersive_cover_summary), "Apple Music 1:1 正方形 沉浸 封面") { onAppearance("player_apple_music_immersive_cover") },
+    entry(stringResource(R.string.settings_search_reopen_behavior), stringResource(R.string.settings_search_reopen_behavior_summary), "搜索 搜索框 清空 保留 选择 上次") { onAppearance("search_reopen_behavior") },
+    entry(stringResource(R.string.settings_list_quality_display), stringResource(R.string.settings_list_quality_display_tablet), "播放列表 音质 平板 手机 显示") { onAppearance("list_quality_display") },
+    entry(stringResource(R.string.settings_karaoke_accompaniment), stringResource(R.string.settings_karaoke_accompaniment_summary), "伴奏 人声 原曲 karaoke 跟唱") { onAudio("audio_playback") },
+    entry(stringResource(R.string.settings_system_bars_mode), stringResource(R.string.settings_system_bars_mode_summary, ""), "沉浸模式 全屏 状态栏 导航栏 隐藏 显示 车机") { onAppearance("system_bars") },
+    entry(stringResource(R.string.settings_player_immersive_mode), stringResource(R.string.settings_player_immersive_mode_summary, ""), "播放页 沉浸 状态栏 导航栏") { onAppearance("player_system_bars") },
+    entry(stringResource(R.string.settings_player_landscape_hide_system_bars), stringResource(R.string.settings_player_landscape_hide_system_bars_summary), "播放页 横屏 状态栏 导航栏 手势条 隐藏") { onAppearance("player_landscape_hide_system_bars") },
+    entry(stringResource(R.string.settings_player_landscape_style), stringResource(R.string.settings_player_landscape_style_summary, ""), "横屏播放 宽屏 歌词 CoverFlow MV 流光") { onAppearance("player_landscape") },
+    entry(stringResource(R.string.settings_dynamic_cover), stringResource(R.string.settings_dynamic_cover_summary), "动态封面 视频封面 MV mp4") { onCoverMedia("dynamic_cover") },
+    entry(stringResource(R.string.settings_home_display), stringResource(R.string.settings_home_display_items_summary), "首页 显示 项目 排序 隐藏 宫格") { onHome("home_sections") },
+    entry(stringResource(R.string.settings_home_tile_colors_title), stringResource(R.string.settings_home_tile_colors_summary), "首页 卡片 颜色 透明度") { onHome("home_tile_colors") },
+    entry(stringResource(R.string.settings_scan_folders), stringResource(R.string.settings_scan_folders_summary), "扫描 文件夹 排除 隐藏目录 存储权限") { onLibrary("scan") },
+    entry(stringResource(R.string.settings_auto_scan_local_playlists), stringResource(R.string.settings_auto_scan_local_playlists_summary), "自动扫描 本地歌单 m3u 播放列表") { onLibrary("auto_scan_local_playlists") },
+    entry(stringResource(R.string.settings_min_duration_filter), stringResource(R.string.settings_min_duration_filter_summary), "扫描 最小时长 过滤 短音频") { onLibrary("min_duration_filter") },
+    entry(stringResource(R.string.settings_tag_ignore_case), stringResource(R.string.settings_tag_ignore_case_summary), "标签 大小写 忽略 英文") { onLibrary("tag_ignore_case") },
+    entry(stringResource(R.string.settings_metadata_editor), "MusicTag LunaBeat 内置编辑器", "元数据 标签 编辑 ID3 FLAC") { onLibrary("tag_scraping") },
+    entry(stringResource(R.string.settings_editor_ask_every_time), "选择标签和歌词编辑器", "编辑器 每次询问 MusicTag LunaBeat") { onLibrary("tag_scraping") },
+    entry(stringResource(R.string.settings_song_rating_display_stars), stringResource(R.string.settings_song_rating_display_stars_summary), "评分 星级 五星 列表") { onLibrary("song_rating_display_stars") },
+    entry(stringResource(R.string.settings_lyric_timing_editor), stringResource(R.string.settings_editor_builtin_lyric_timing), "打轴 歌词 时间轴 LRC ELRC TTML LySy") { onLibrary("tag_scraping") },
+    entry(stringResource(R.string.settings_font_screen_title), stringResource(R.string.settings_lyric_font), "歌词 字体 原文 翻译 CJK 西文 导入") { onLyricFont() },
+    entry(stringResource(R.string.settings_lyric_plugin_sources), stringResource(R.string.settings_lyric_plugin_sources_summary), "歌词 源 插件 导入 在线 匹配") { onLyricPlugins() },
+    entry(stringResource(R.string.settings_lyric_line_blacklist), stringResource(R.string.settings_lyric_line_blacklist_summary), "歌词 黑名单 过滤 行") { onLyrics("lyric_basic") },
+    entry(stringResource(R.string.settings_player_lyric_text_align), stringResource(R.string.settings_lyric_scale_summary), "歌词 对齐 左 中 右 大小 缩放") { onLyrics("lyric_basic") },
+    entry(stringResource(R.string.settings_mini_player_cover_rotation), stringResource(R.string.settings_mini_player_cover_rotation_summary), "迷你播放器 封面 旋转") { onLyrics("mini_player_cover_rotation") },
+    entry(stringResource(R.string.settings_mini_player_swipe_to_open_player), stringResource(R.string.settings_mini_player_swipe_to_open_player_summary), "迷你播放条 上滑 播放页 手势") { onLyrics("mini_player_swipe_to_open_player") },
+    entry(stringResource(R.string.settings_mini_player_right_button), stringResource(R.string.settings_mini_player_right_button_summary), "迷你播放条 右侧 下一首 队列") { onLyrics("mini_player_right_button") },
+    entry(stringResource(R.string.settings_enable_bluetooth_lyric), stringResource(R.string.settings_enable_bluetooth_lyric_summary), "蓝牙 歌词 设备") { onLyrics("lyric_output") },
+    entry(stringResource(R.string.settings_enable_flyme_ticker), stringResource(R.string.settings_enable_flyme_ticker_summary), "Flyme 魅族 状态栏 歌词") { onLyrics("lyric_output") },
+    entry(stringResource(R.string.settings_enable_lyric_getter), stringResource(R.string.settings_enable_lyric_getter_summary), "歌词 获取器 广播") { onLyrics("lyric_output") },
+    entry(stringResource(R.string.settings_heads_up_lyric_notifications), stringResource(R.string.settings_heads_up_lyric_notifications_summary), "通知 横幅 歌词") { onLyrics("lyric_output") },
+    entry(stringResource(R.string.settings_usb_dac_mode), stringResource(R.string.settings_usb_dac_mode_summary), "USB DAC 独占 输出 采样率 位深") { onAudio("audio_output") },
+    entry(stringResource(R.string.settings_decoder), stringResource(R.string.settings_audio_decoder_auto_summary), "解码 FFmpeg 系统 音频焦点") { onAudio("audio_system") },
+    entry(stringResource(R.string.equalizer_screen_title), stringResource(R.string.settings_audio_equalizer_summary), "均衡器 EQ 音效") { onEqualizer("equalizer") },
+    entry(stringResource(R.string.equalizer_surround_360_enable), stringResource(R.string.equalizer_surround_360_summary), "360 环绕音 空间音频 全景") { onEqualizer("equalizer") },
+    entry(stringResource(R.string.equalizer_crossfeed_enable), stringResource(R.string.equalizer_crossfeed_summary), "串音 耳机 crossfeed") { onEqualizer("equalizer") },
+    entry(stringResource(R.string.equalizer_compressor_enable), "压缩器动态范围控制", "压缩器 compressor 阈值 比率") { onEqualizer("equalizer") },
+    entry(stringResource(R.string.settings_ai_interpretation), stringResource(R.string.settings_openai_api_key_summary), "AI 供应商 模型 API Anthropic DeepSeek") { onIntegration("ai") },
+    entry(stringResource(R.string.settings_mcp_server), stringResource(R.string.settings_mcp_server_summary), "MCP 服务 本地 端口") { onIntegration("mcp") },
+    entry(stringResource(R.string.web_music_beta_title), stringResource(R.string.web_music_beta_summary), "Web 网页 局域网 上传 播放 Beta") { onIntegration("web_music") },
+    entry(stringResource(R.string.settings_lastfm), stringResource(R.string.settings_lastfm_summary), "Last.fm scrobble 听歌记录") { onIntegration("lastfm") },
+    entry(stringResource(R.string.settings_backup), stringResource(R.string.settings_backup_summary), "备份 恢复 WebDAV 自动备份") { onBackup("backup_settings") },
+    entry(stringResource(R.string.settings_logs), stringResource(R.string.settings_logs_summary), "日志 崩溃 调试 logcat") { onLogs() },
+    entry(stringResource(R.string.about), BuildConfig.VERSION_NAME, "版本 更新 开源协议 第三方许可") { onAbout() }
+)
