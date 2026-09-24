@@ -35,13 +35,17 @@ jobs:
           mkdir -p /tmp/halcyon-source
           unzip -q /tmp/halcyon-source.zip -d /tmp/halcyon-source
 
-      - name: Install source into repository
+      - name: Install source without CI workflow files
         shell: bash
         run: |
           set -euo pipefail
-          cp -a /tmp/halcyon-source/. .
+
+          # GitHub's GITHUB_TOKEN cannot push changes to workflow files
+          # unless it has the special workflows permission.
+          # Leave the Android CI workflow out of this bootstrap.
+          rsync -a --exclude='.github/workflows/' /tmp/halcyon-source/ ./
+
           rm -f halcyon-source.part-00 halcyon-source.part-01
-          rm -f .github/workflows/bootstrap-halcyon-source.yml
 
       - name: Commit source
         shell: bash
@@ -50,9 +54,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
+
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
+
           git commit -m "Bootstrap Halcyon source with Apple Music TTML lyrics"
           git push
