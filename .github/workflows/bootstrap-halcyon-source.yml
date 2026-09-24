@@ -1,0 +1,58 @@
+name: Bootstrap Halcyon source
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rebuild and extract source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          parts=(halcyon-source.part-*)
+          if [ "${#parts[@]}" -lt 2 ]; then
+            echo "Expected the two halcyon-source.part-* files."
+            exit 1
+          fi
+
+          : > /tmp/halcyon-source.zip
+          for part in "${parts[@]}"; do
+            echo "Appending $part"
+            cat "$part" >> /tmp/halcyon-source.zip
+          done
+
+          unzip -t /tmp/halcyon-source.zip
+          rm -rf /tmp/halcyon-source
+          mkdir -p /tmp/halcyon-source
+          unzip -q /tmp/halcyon-source.zip -d /tmp/halcyon-source
+
+      - name: Install source into repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a /tmp/halcyon-source/. .
+          rm -f halcyon-source.part-00 halcyon-source.part-01
+          rm -f .github/workflows/bootstrap-halcyon-source.yml
+
+      - name: Commit source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Bootstrap Halcyon source with Apple Music TTML lyrics"
+          git push
