@@ -1,8 +1,6 @@
 package com.ella.music.ui.player
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -71,38 +69,16 @@ internal fun appleMusicKaraokeLiftPx(
     wordLiftEnabled: Boolean,
     textSizePx: Float,
     elapsedSinceWordStartMs: Long,
-    activeLineProgress: Float = 1f,
     wordLiftScale: Float = 1f,
-    riseDurationMs: Long = 180L
-): Float {
-    if (!wordLiftEnabled || activeLineProgress <= 0f || elapsedSinceWordStartMs <= 0L) return 0f
-
-    // Normal words use a single monotonic lift: rise smoothly at the word onset, then HOLD at
-    // the apex for the rest of the active line. The old sine pop returned to zero after 220ms,
-    // which is exactly the unwanted up/down motion. The line-level active animation is responsible
-    // for releasing the whole line when playback advances to the next lyric row.
-    val riseProgress = (elapsedSinceWordStartMs.toFloat() / riseDurationMs.coerceAtLeast(1L).toFloat())
-        .coerceIn(0f, 1f)
-    val easedRise = kotlin.math.sin((riseProgress * (kotlin.math.PI / 2.0)).toFloat())
-    val baseLift = maxOf(textSizePx * 0.06f, 5f) * wordLiftScale.coerceIn(0f, 1f)
-    return baseLift * easedRise * activeLineProgress.coerceIn(0f, 1f)
-}
-
-private fun appleMusicTtmlWordBaseLiftPx(
-    textSizePx: Float,
-    wordStartMs: Long,
-    positionMs: Long,
-    activeLineProgress: Float,
-    wordLiftScale: Float
-): Float {
-    return appleMusicKaraokeLiftPx(
-        wordLiftEnabled = true,
-        textSizePx = textSizePx,
-        elapsedSinceWordStartMs = positionMs - wordStartMs,
-        activeLineProgress = activeLineProgress,
-        wordLiftScale = wordLiftScale
-    )
-}
+    popDurationMs: Long = 260L,
+    activeLine: Boolean = true
+): Float = AmLyricsMotionEngine.wordLiftPx(
+    textSizePx = textSizePx,
+    elapsedSinceWordStartMs = elapsedSinceWordStartMs,
+    enabled = wordLiftEnabled && activeLine,
+    riseDurationMs = popDurationMs,
+    scale = wordLiftScale
+)
 
 @Composable
 internal fun TimedLyricText(
@@ -187,13 +163,6 @@ internal fun TimedLyricText(
     // instead of a value they take as a parameter, so a frame no longer recomposes the whole
     // line's worth of word subtrees just to move one feathered edge.
     val positionState = rememberUpdatedState(positionMs)
-    // One shared visibility progress lets every word release together when the active line changes.
-    // The clock is still read from graphicsLayer, so playback does not recompose the text tree.
-    val activeWordLiftProgress = animateFloatAsState(
-        targetValue = if (active && wordLiftEnabled) 1f else 0f,
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-        label = "appleLyricsWordLift"
-    )
     val content: @Composable () -> Unit = {
         var wordIndex = 0
         while (wordIndex < timedWords.size) {
@@ -210,7 +179,6 @@ internal fun TimedLyricText(
                     wordLiftScale = wordLiftScale,
                     sustainGlowScale = sustainGlowScale,
                     activeGlowProgress = activeGlowProgress,
-                    activeLineLiftProgress = activeWordLiftProgress,
                     ruby = rubies.getOrNull(wordIndex).orEmpty(),
                     rubyStyle = rubyStyle,
                     rubyBelow = rubyBelow,
@@ -241,8 +209,7 @@ internal fun TimedLyricText(
                                 groupEndMs = groupWord.characterGroupEndMs ?: groupWord.word.endMs,
                                 positionMs = positionState.value,
                                 enabled = wordLiftEnabled,
-                                wordLiftScale = wordLiftScale,
-                                activeLineProgress = activeWordLiftProgress.value
+                                activeLine = active
                             )
                             transformOrigin = TransformOrigin(0.5f, if (rubyBelow) 0f else 1f)
                         }
@@ -261,7 +228,6 @@ internal fun TimedLyricText(
                             wordLiftScale = wordLiftScale,
                             sustainGlowScale = sustainGlowScale,
                             activeGlowProgress = activeGlowProgress,
-                            activeLineLiftProgress = activeWordLiftProgress,
                             useIndividualLift = !ttmlMotionEnabled,
                             ruby = rubies.getOrNull(charIndex).orEmpty(),
                             rubyStyle = rubyStyle,
@@ -436,7 +402,6 @@ private fun AppleMusicKaraokeWord(
     wordLiftScale: Float = 1f,
     sustainGlowScale: Float = 1f,
     activeGlowProgress: State<Float>? = null,
-    activeLineLiftProgress: State<Float>? = null,
     useIndividualLift: Boolean = true,
     ruby: String = "",
     rubyStyle: TextStyle? = null,
@@ -492,8 +457,8 @@ private fun AppleMusicKaraokeWord(
                         wordLiftEnabled = wordLiftEnabled,
                         textSizePx = baseStyle.fontSize.toPx(),
                         elapsedSinceWordStartMs = positionMs.value - renderWord.word.startMs,
-                        activeLineProgress = activeLineLiftProgress?.value ?: if (active) 1f else 0f,
-                        wordLiftScale = wordLiftScale
+                        wordLiftScale = wordLiftScale,
+                        activeLine = active
                     )
                 } else {
                     0f
@@ -1062,41 +1027,14 @@ private fun appleMusicTtmlCharacterGroupLiftPx(
     groupEndMs: Long,
     positionMs: Long,
     enabled: Boolean,
-    wordLiftScale: Float,
-    activeLineProgress: Float
-): Float {
-    if (!enabled || groupEndMs <= groupStartMs) return 0f
-
-    // The entire character-timed word first gets the same persistent base lift as a normal word.
-    // It then receives an additional arch that is shared by the whole word. This means the
-    // characters can highlight one-by-one while the vertical motion remains one continuous
-    // object. At the exact end of the word, the extra arch is back at zero, so the characters end
-    // at the SAME height as a normal active word and stay there until the line changes.
-    val baseLift = appleMusicTtmlWordBaseLiftPx(
-        textSizePx = textSizePx,
-        wordStartMs = groupStartMs,
-        positionMs = positionMs,
-        activeLineProgress = activeLineProgress,
-        wordLiftScale = wordLiftScale
-    )
-
-    val durationMs = (groupEndMs - groupStartMs).coerceAtLeast(1L)
-    val elapsedMs = positionMs - groupStartMs
-    if (elapsedMs <= 0L || elapsedMs >= durationMs) return baseLift
-
-    // The arch height grows with the duration of the timed word, with practical clamps so very
-    // short words remain subtle and very long words do not fly too far above the normal line.
-    val durationFactor = ((durationMs - 180L).toFloat() / 2_820f).coerceIn(0f, 1f)
-    val durationScale = 0.90f + durationFactor * 0.55f
-    val extraBase = maxOf(textSizePx * 0.095f, 6f)
-    val maxExtraLift = (extraBase * durationScale)
-        .coerceAtMost(maxOf(textSizePx * 0.30f, 22f)) * wordLiftScale.coerceIn(0f, 1f)
-
-    // One smooth arch: normal height -> apex -> normal height. No second drop to baseline.
-    val progress = (elapsedMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-    val arch = kotlin.math.sin((progress * kotlin.math.PI).toFloat())
-    return baseLift + maxExtraLift * arch * activeLineProgress.coerceIn(0f, 1f)
-}
+    activeLine: Boolean
+): Float = AmLyricsMotionEngine.characterTimedWordLiftPx(
+    textSizePx = textSizePx,
+    groupStartMs = groupStartMs,
+    groupEndMs = groupEndMs,
+    positionMs = positionMs,
+    enabled = enabled && activeLine
+)
 
 private fun AppleMusicRenderWord.sustainGlowAlpha(positionMs: Long, active: Boolean): Float {
     val sustainEndMs = sustainEndMs ?: return 0f
